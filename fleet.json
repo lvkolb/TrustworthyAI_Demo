@@ -1,0 +1,138 @@
+[
+    {
+        "id": "RK-IN-71-1",
+        "type": "RTW (Ambulance)",
+        "status_code": "2 (Available)",
+        "location": "Station North",
+        "battery_level": 98,
+        "crew_state": "Fresh",
+        "equipment": [
+            "Standard"
+        ]
+    },
+    {
+        "id": "RK-IN-71-2",
+        "type": "RTW (Ambulance)",
+        "status_code": "8 (Finishing)",
+        "location": "Klinikum (Hospital)",
+        "time_until_free": "3 min",
+        "battery_level": 75,
+        "crew_state": "Fresh",
+        "equipment": [
+            "Standard"
+        ]
+    },
+    {
+        "id": "RK-IN-71-3",
+        "type": "RTW (Ambulance)",
+        "status_code": "6 (Out of Service)",
+        "location": "Station South",
+        "battery_level": 10,
+        "crew_state": "N/A",
+        "equipment": [
+            "Maintenance"
+        ]
+    },
+    {
+        "id": "RK-IN-72-1",
+        "type": "RTW (Electric)",
+        "status_code": "2 (Available)",
+        "location": "Station South",
+        "battery_level": 12,
+        "crew_state": "Fresh",
+        "equipment": [
+            "Standard"
+        ],
+        "notes": "Low Range Warning"
+    },
+    {
+        "id": "NEF-IN-10",
+        "type": "NEF (Doctor Car)",
+        "status_code": "2 (Available)",
+        "location": "Station North",
+        "battery_level": 100,
+        "crew_state": "Fatigued (Shift ends in 20m)",
+        "equipment": [
+            "Doctor",
+            "Advanced Drugs"
+        ]
+    },
+    {
+        "id": "NEF-IN-20",
+        "type": "NEF (Doctor Car)",
+        "status_code": "4 (Busy)",
+        "location": "Highway A9",
+        "battery_level": 50,
+        "crew_state": "Fresh",
+        "equipment": [
+            "Doctor"
+        ]
+    },
+    {
+        "id": "FL-IN-1-40",
+        "type": "HLF (Fire Engine)",
+        "status_code": "2 (Available)",
+        "location": "Fire Station Main",
+        "battery_level": 90,
+        "crew_state": "Fresh",
+        "equipment": [
+            "Jaws of Life",
+            "Water"
+        ]
+    },
+    {
+        "id": "FL-IN-1-30",
+        "type": "DLK (Ladder)",
+        "status_code": "2 (Available)",
+        "location": "Fire Station Main",
+        "battery_level": 85,
+        "crew_state": "Fresh",
+        "equipment": [
+            "30m Ladder"
+        ]
+    },
+    {
+        "id": "CHR-32",
+        "type": "RTH (Helicopter)",
+        "status_code": "2 (Available)",
+        "location": "Airbase",
+        "battery_level": 100,
+        "crew_state": "Fresh",
+        "equipment": [
+            "Air Rescue"
+        ]
+    },
+    {
+        "id": "POL-IN-55",
+        "type": "Patrol Car",
+        "status_code": "1 (Radio Patrol)",
+        "location": "City Center",
+        "battery_level": 60,
+        "crew_state": "Fresh",
+        "equipment": [
+            "Police"
+        ]
+    },
+    {
+        "id": "KTW-IN-04",
+        "type": "KTW (Transport)",
+        "status_code": "2 (Available)",
+        "location": "Station East",
+        "battery_level": 40,
+        "crew_state": "Fresh",
+        "equipment": [
+            "Basic"
+        ]
+    },
+    {
+        "id": "RK-IN-80-1",
+        "type": "RTW (Reserve)",
+        "status_code": "2 (Available)",
+        "location": "Station North",
+        "battery_level": 100,
+        "crew_state": "Unknown (Volunteer Crew)",
+        "equipment": [
+            "Standard"
+        ]
+    }
+]

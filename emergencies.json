@@ -1,0 +1,102 @@
+[
+  {
+    "id": "CMD-01",
+    "type": "Cardiac Arrest",
+    "location": "Viktualienmarkt, Ingolstadt",
+    "severity": "Critical",
+    "time_received": "10:42",
+    "data_quality": "High (GPS Exact)",
+    "required_equipment": "Defibrillator",
+    "description": "Male, 60s, collapsed. Bystander CPR in progress."
+  },
+  {
+    "id": "CMD-02",
+    "type": "Traffic Accident",
+    "location": "A9 Highway, Exit Ingolstadt-Nord",
+    "severity": "High",
+    "time_received": "10:45",
+    "data_quality": "Medium (Caller on highway)",
+    "required_equipment": "Hydraulic Rescue Tool",
+    "description": "Two vehicles, high speed impact. Potential trapped persons."
+  },
+  {
+    "id": "CMD-03",
+    "type": "Child High Fever",
+    "location": "Kindergarten Piusviertel",
+    "severity": "Medium",
+    "time_received": "10:55",
+    "data_quality": "High",
+    "required_equipment": "Pediatric Kit",
+    "description": "Child (4y) with febrile seizure. Conscious."
+  },
+  {
+    "id": "CMD-04",
+    "type": "Forest Injury",
+    "location": "Zucheringer Wald (Approx)",
+    "severity": "Medium",
+    "time_received": "11:02",
+    "data_quality": "Low (Cell Tower Triangulation +/- 500m)",
+    "required_equipment": "Off-road capability",
+    "description": "Hiker twisted ankle. Exact location unknown."
+  },
+  {
+    "id": "CMD-05",
+    "type": "Apartment Fire",
+    "location": "Harderstraße 12",
+    "severity": "Critical",
+    "time_received": "11:10",
+    "data_quality": "High",
+    "required_equipment": "Ladder Truck (DLK)",
+    "description": "Smoke visible from 3rd floor. Occupancy unknown."
+  },
+  {
+    "id": "CMD-06",
+    "type": "Intoxicated Person",
+    "location": "Hauptbahnhof Main Entrance",
+    "severity": "Low",
+    "time_received": "11:15",
+    "data_quality": "High",
+    "required_equipment": "Basic Life Support",
+    "description": "Person sleeping on bench, difficult to wake."
+  },
+  {
+    "id": "CMD-07",
+    "type": "Stroke Suspected",
+    "location": "Westpark Shopping Center",
+    "severity": "High",
+    "time_received": "11:20",
+    "data_quality": "High",
+    "required_equipment": "Stroke Unit / Doctor",
+    "description": "Female, 50s, slurred speech and facial droop."
+  },
+  {
+    "id": "CMD-08",
+    "type": "Industrial Accident",
+    "location": "Audi Factory Hall B",
+    "severity": "Critical",
+    "time_received": "11:30",
+    "data_quality": "High (Internal Hotline)",
+    "required_equipment": "Trauma Kit",
+    "description": "Crush injury involving machinery."
+  },
+  {
+    "id": "CMD-09",
+    "type": "Water Rescue",
+    "location": "Donau River, Konrad-Adenauer-Brücke",
+    "severity": "High",
+    "time_received": "11:35",
+    "data_quality": "Vague (Visual report from bridge)",
+    "required_equipment": "Boat / Diver",
+    "description": "Person seen drifting in current."
+  },
+  {
+    "id": "CMD-10",
+    "type": "Panic Attack",
+    "location": "University Campus",
+    "severity": "Low",
+    "time_received": "11:40",
+    "data_quality": "High",
+    "required_equipment": "Psychological Support",
+    "description": "Student hyperventilating, no physical injury."
+  }
+]

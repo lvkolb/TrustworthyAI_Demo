@@ -5,71 +5,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neural Dispatch Core | Ingolstadt</title>
-
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
         rel="stylesheet">
-
-    <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
-
-    <!-- Icons -->
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
 </head>
 
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar glass-panel">
+
+        <aside class="sidebar-left glass-panel">
             <div class="sidebar-header">
                 <div class="logo">
-                    <i class="ri-radar-fill"></i>
-                    <span>NEURAL CORE</span>
+                    <i class="ri-alert-fill" style="color:#ef4444;"></i>
+                    <span>INCIDENT CMD</span>
                 </div>
                 <div class="status-badge">
-                    <span class="pulse-dot"></span>
-                    ONLINE
+                    <span class="pulse-dot"></span> LIVE
                 </div>
             </div>
 
-            <div class="emergency-control-panel">
-                <button id="get-emergency-btn" class="main-trigger-btn">
-                    <i class="ri-alarm-warning-line"></i>
-                    <span>GET EMERGENCY</span>
+            <div id="emergency-display-area" class="emergency-info-box empty">
+                <div class="empty-state-content">
+                    <i class="ri-radar-line"></i>
+                    <p>Monitoring frequency...</p>
+                    <span>Waiting for incoming call</span>
+                </div>
+            </div>
+
+            <div class="control-footer">
+                <button id="randomize-btn" class="main-trigger-btn">
+                    <i class="ri-dice-line"></i>
+                    <span>RANDOMIZE INCIDENT</span>
                 </button>
-            </div>
 
-            <div class="fleet-list-section">
-                <h3>Fleet Overview</h3>
-                <div id="fleet-list" class="scroll-area">
-                    <!-- Fleet items injected here -->
-                </div>
-            </div>
-
-            <div class="stats-panel">
-                <div class="stat-item">
-                    <span class="label">Fleet Status</span>
-                    <span class="value success">92% Ready</span>
-                </div>
-                <div class="stat-item">
-                    <span class="label">Avg Response</span>
-                    <span class="value">4.2 min</span>
-                </div>
+                <button id="start-dispatch-btn" class="dispatch-action-btn" disabled>
+                    <i class="ri-flashlight-fill"></i>
+                    <span>START DISPATCH</span>
+                </button>
             </div>
         </aside>
 
-        <!-- Main Map Area -->
         <main class="map-wrapper">
             <div id="map"></div>
-
-            <!-- Floating Controls -->
             <div class="map-overlay-top">
                 <div class="glass-pill">
                     <i class="ri-map-pin-range-line"></i>
@@ -77,86 +60,32 @@
                 </div>
             </div>
         </main>
+
+        <aside class="sidebar-right glass-panel">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="ri-roadster-fill"></i>
+                    <span>FLEET STATUS</span>
+                </div>
+                <div class="stat-pill">
+                    <span id="fleet-count">--</span> Units
+                </div>
+            </div>
+
+            <div class="fleet-list-section">
+                <div id="fleet-list" class="scroll-area">
+                </div>
+            </div>
+        </aside>
+
     </div>
 
-    <!-- Modal for Analysis -->
     <div id="analysis-modal" class="modal-backdrop hidden">
         <div class="modal-content glass-panel">
-            <div class="modal-header">
-                <div>
-                    <h2 id="modal-title">CMD-01: Cardiac Arrest</h2>
-                    <span id="modal-subtitle" class="badge crit">CRITICAL</span>
-                </div>
-                <button id="close-modal" class="close-btn"><i class="ri-close-line"></i></button>
-            </div>
-
-            <div class="modal-body">
-                <div class="split-view">
-                    <!-- Incident Details -->
-                    <div class="incident-details">
-                        <h4>Incident Data</h4>
-                        <div class="detail-grid">
-                            <div class="detail-item">
-                                <label>Location</label>
-                                <span id="detail-loc">Viktualienmarkt</span>
-                            </div>
-                            <div class="detail-item">
-                                <label>Equipment</label>
-                                <span id="detail-eq">Defibrillator</span>
-                            </div>
-                            <div class="detail-item">
-                                <label>Reported</label>
-                                <span id="detail-time">10:42</span>
-                            </div>
-                        </div>
-                        <div class="map-mini-preview" id="mini-map">
-                            <!-- Mini context map could go here -->
-                        </div>
-                    </div>
-
-                    <!-- AI Reasoning Engine -->
-                    <div class="ai-engine">
-                        <div class="ai-header">
-                            <i class="ri-brain-line"></i>
-                            <span>Neural Analysis & Dispatch</span>
-                        </div>
-
-                        <div class="recommendation-card" id="rec-card">
-                            <div class="rec-header">
-                                <span class="label">Primary Recommendation</span>
-                                <span class="confidence-badge" id="ai-confidence">98% Conf</span>
-                            </div>
-                            <!-- Selected Unit Display -->
-                            <div class="selected-unit-display" id="selected-unit-display">
-                                <!-- Dynamic Content -->
-                            </div>
-                        </div>
-
-                        <div class="alternatives-section">
-                            <h5>Available Units (Select to Override)</h5>
-                            <div id="alternatives-list" class="alternatives-grid">
-                                <!-- Injected candidates -->
-                            </div>
-                        </div>
-
-                        <div class="reasoning-box">
-                            <h5>Reasoning</h5>
-                            <p id="rec-reasoning">
-                                Analysis complete.
-                            </p>
-                            <div id="risk-tags" class="tags-row"></div>
-                        </div>
-
-                        <button class="action-btn" id="dispatch-btn">
-                            <i class="ri-send-plane-fill"></i> CONFIRM DISPATCH
-                        </button>
-                    </div>
-                </div>
-            </div>
         </div>
+        <button id="close-modal" class="close-modal-fab"><i class="ri-close-line"></i></button>
     </div>
 
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="app.js"></script>

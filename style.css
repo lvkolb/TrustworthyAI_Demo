@@ -828,3 +828,251 @@ body {
     font-size: 0.8rem;
     color: #9ca3af;
 }
+
+/* LAYOUT GRID */
+.app-container {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background-color: #0f172a;
+    color: white;
+}
+
+/* LEFT SIDEBAR (Incident) */
+.sidebar-left {
+    width: 320px;
+    background: rgba(17, 24, 39, 0.95);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    z-index: 20;
+    padding: 20px;
+    flex-shrink: 0;
+}
+
+/* RIGHT SIDEBAR (Fleet) */
+.sidebar-right {
+    width: 300px;
+    background: rgba(17, 24, 39, 0.95);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    z-index: 20;
+    padding: 20px;
+    flex-shrink: 0;
+}
+
+/* MAP CENTER */
+.map-wrapper {
+    flex-grow: 1;
+    position: relative;
+    z-index: 1;
+}
+
+/* EMERGENCY INFO BOX (Left Panel) */
+.emergency-info-box {
+    flex-grow: 1;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    margin: 20px 0;
+    padding: 20px;
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.emergency-info-box.empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-state-content {
+    text-align: center;
+    color: #6b7280;
+}
+
+.empty-state-content i {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 10px;
+}
+
+/* Data Rows in Left Panel */
+.info-row {
+    margin-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 10px;
+}
+
+.info-label {
+    display: block;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+
+.info-val {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: white;
+}
+
+.info-desc {
+    font-size: 0.9rem;
+    color: #d1d5db;
+    font-style: italic;
+    line-height: 1.4;
+}
+
+/* BUTTONS */
+.control-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.main-trigger-btn {
+    width: 100%;
+    padding: 15px;
+    background: #374151;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.2s;
+}
+
+.main-trigger-btn:hover {
+    background: #4b5563;
+}
+
+.dispatch-action-btn {
+    width: 100%;
+    padding: 15px;
+    background: #10b981;
+    /* Green */
+    border: none;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+.dispatch-action-btn:disabled {
+    background: #1f2937;
+    color: #4b5563;
+    cursor: not-allowed;
+    box-shadow: none;
+    border: 1px solid #374151;
+}
+
+.dispatch-action-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+/* SCROLL AREA FIX */
+.scroll-area {
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+/* Add to bottom of style.css */
+.close-modal-fab {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2005;
+    /* Must be higher than modal backdrop */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    transition: transform 0.2s;
+}
+
+.close-modal-fab:hover {
+    transform: scale(1.1);
+    background: #dc2626;
+}
+
+/* Add to style.css */
+
+.alt-card-header {
+    padding: 12px 15px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.2s;
+}
+
+.alt-card-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.alt-details {
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 12px 15px;
+    font-size: 0.8rem;
+    display: none;
+    /* Hidden by default */
+    animation: slideDown 0.2s ease-out;
+}
+
+.alt-details.open {
+    display: block;
+}
+
+.tradeoff-row {
+    display: flex;
+    margin-bottom: 6px;
+    padding-left: 10px;
+    border-left: 2px solid #374151;
+}
+
+.tradeoff-label {
+    color: #9ca3af;
+    width: 90px;
+    flex-shrink: 0;
+}
+
+.tradeoff-val {
+    color: #e5e7eb;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

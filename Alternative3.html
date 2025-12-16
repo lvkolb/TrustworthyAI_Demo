@@ -1,0 +1,1933 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Leitstelle Ingolstadt - Cognitive Dispatch</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@2.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-modal: #111827;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+            --accent-orange: #f59e0b;
+            --border: #334155;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        #app-grid {
+            display: grid;
+            grid-template-columns: 380px 1fr 300px;
+            height: 100vh;
+        }
+
+        #sidebar-left {
+            background: var(--bg-card);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            z-index: 20;
+        }
+
+        #sidebar-right {
+            background: var(--bg-card);
+            border-left: 1px solid var(--border);
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        #map-container {
+            position: relative;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+        }
+
+        /* --- MAP MARKERS --- */
+
+        /* 1. Static Locations (The Blue Markers you asked for) */
+        .static-loc-marker {
+            background-color: var(--accent-blue);
+            border: 2px solid white;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            font-size: 14px;
+        }
+
+        /* 2. Fleet Vehicles */
+        .fleet-marker {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 6px;
+            /* Square with rounded corners for vehicles */
+            color: white;
+            font-weight: bold;
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+            z-index: 500;
+            /* Above static locations */
+        }
+
+        /* Status Colors */
+        .status-ready {
+            background-color: var(--accent-green);
+        }
+
+        .status-busy {
+            background-color: var(--accent-red);
+        }
+
+        .status-maint {
+            background-color: var(--accent-orange);
+        }
+
+
+        /* 1. The Container (Handled by Leaflet - NO ANIMATION here) */
+        .emergency-marker-wrapper {
+            background: transparent !important;
+            border: none !important;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 2. The Inner Circle (This gets the animation) */
+        .emergency-pulse-inner {
+            width: 40px;
+            height: 40px;
+            background-color: #ec4899;
+            /* Pink-500 */
+            border: 3px solid white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 22px;
+            box-sizing: border-box;
+            box-shadow: 0 0 15px rgba(236, 72, 153, 0.8);
+            animation: pulse-pink 1.5s infinite;
+        }
+
+        @keyframes pulse-pink {
+            0% {
+                transform: scale(0.95);
+                /* Safe to scale inner element */
+                box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7);
+            }
+
+            70% {
+                transform: scale(1.1);
+                box-shadow: 0 0 0 15px rgba(236, 72, 153, 0);
+            }
+
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(236, 72, 153, 0);
+            }
+        }
+
+        /* FIXED: Squad Highlight (Higher Z-Index to prevent hiding behind other cars) */
+        /* Updated SQUAD HIGHLIGHT */
+        .squad-highlight {
+            /* Force High Z-Index in CSS as backup */
+            z-index: 9999 !important;
+            border-color: #fbbf24 !important;
+            /* Amber-400 */
+            border-width: 2px !important;
+            background-color: #0f172a !important;
+            /* Dark background so ring stands out */
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite !important;
+        }
+
+        @keyframes pulse-ring {
+            0% {
+                box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 15px rgba(251, 191, 36, 0);
+                /* Increased spread to 15px */
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+            }
+        }
+
+
+        /* UI ELEMENTS (Existing) */
+        #squad-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            bottom: 20px;
+            width: 440px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            transition: 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-primary {
+            background: var(--accent-green);
+            color: #064e3b;
+        }
+
+        .btn-primary:hover {
+            background: #34d399;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border: 1px dashed var(--text-muted);
+            color: var(--text-muted);
+        }
+
+        .btn-ghost:hover {
+            border-color: var(--text-main);
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .asr-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 3px solid var(--accent-blue);
+            font-family: monospace;
+            min-height: 80px;
+            position: relative;
+        }
+
+        .asr-cursor {
+            display: inline-block;
+            width: 8px;
+            height: 16px;
+            background: var(--accent-green);
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        .keyword {
+            color: var(--accent-red);
+            font-weight: bold;
+            text-decoration: underline;
+        }
+
+        .slot-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 0 15px 10px 15px;
+            padding: 15px;
+            transition: all 0.2s;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .slot-card:hover {
+            border-color: var(--accent-green);
+            transform: translateX(5px);
+        }
+
+        .slot-role {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .slot-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .slot-id {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .slot-conf {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .warning-border {
+            border-color: var(--accent-orange) !important;
+        }
+
+        .warning-text {
+            color: var(--accent-orange) !important;
+        }
+
+        .smart-explanation {
+            font-size: 0.75rem;
+            color: #fbbf24;
+            background: rgba(245, 158, 11, 0.15);
+            padding: 8px 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+            border-left: 3px solid #fbbf24;
+            display: flex;
+            align-items: start;
+            gap: 8px;
+            line-height: 1.3;
+        }
+
+        /* Modal & Lists */
+        .xai-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(8px);
+        }
+
+        .xai-card {
+            background: var(--bg-modal);
+            width: 1100px;
+            height: 750px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            display: grid;
+            grid-template-rows: auto auto 1fr;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+        }
+
+        .xai-header {
+            padding: 25px 30px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .xai-title-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .xai-unit-id {
+            font-size: 2.5rem;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 5px;
+        }
+
+        .xai-score-big {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent-green);
+            line-height: 1;
+            text-align: right;
+        }
+
+        .xai-eta-big {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: white;
+            line-height: 1;
+            margin-right: 15px;
+        }
+
+        .xai-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            padding: 20px 30px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .metric-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .metric-val {
+            color: var(--accent-green);
+        }
+
+        .progress-bg {
+            height: 4px;
+            background: #374151;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-green);
+            border-radius: 2px;
+        }
+
+        .xai-content {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 30px;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .trust-box {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 3px solid var(--accent-blue);
+            padding: 15px;
+            border-radius: 0 4px 4px 0;
+            margin-bottom: 20px;
+        }
+
+        .rationale-item {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+
+        .rat-head {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .rat-status {
+            color: var(--accent-green);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.9rem;
+        }
+
+        .rat-desc {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            border-left: 2px solid var(--accent-green);
+            padding-left: 10px;
+        }
+
+        .sec-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .sec-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .sec-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .sec-item i {
+            font-size: 1.2rem;
+            color: var(--text-main);
+        }
+
+        .alt-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-bottom: 10px;
+        }
+
+        .alt-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--text-muted);
+        }
+
+        .alt-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .warn-red {
+            color: var(--accent-red);
+        }
+
+        .warn-orange {
+            color: var(--accent-orange);
+        }
+
+        .expert-override-banner {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+            font-style: italic;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 2rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            z-index: 100;
+        }
+
+        .fleet-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+
+        .fleet-status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div style="position: absolute; top: 10px; right: 10px; z-index: 1001;">
+        <button onclick="toggleLanguage()" class="btn btn-ghost"
+            style="background: rgba(0,0,0,0.5); color: white; border: 1px solid #555;">
+            <span id="lang-label">DE</span>
+        </button>
+    </div>
+
+    <div id="app-grid">
+        <div id="sidebar-left">
+            <div class="sidebar-section">
+                <h3
+                    style="margin: 0 0 5px 0; color: var(--accent-green); display: flex; align-items: center; gap: 10px;">
+                    <i class="ri-government-line"></i> <span data-i18n="header_title">LEITSTELLE INGOLSTADT</span>
+                </h3>
+                <div style="font-size: 0.75rem; color: var(--text-muted);" data-i18n="header_subtitle">COGNITIVE
+                    DISPATCH CORE v3.3 (Data: Original)</div>
+            </div>
+
+            <div class="sidebar-section" id="call-area" style="flex:1; display:flex; flex-direction:column;">
+                <div
+                    style="font-size: 0.7rem; text-transform: uppercase; color: var(--accent-blue); font-weight: bold; margin-bottom: 10px;">
+                    <i class="ri-radio-line"></i> <span data-i18n="live_input">LIVE EINGANG</span>
+                </div>
+
+                <div class="asr-box">
+                    <span id="asr-text" data-i18n="system_ready">System bereit...</span><span class="asr-cursor"></span>
+                </div>
+
+                <div id="detected-tags" style="margin-top: 20px; opacity: 0; transition: 1s;">
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <div
+                            style="background: rgba(239,68,68,0.2); color: var(--accent-red); padding: 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; flex:1;">
+                            <div style="font-size:0.6rem; opacity:0.7" data-i18n="tag_type">MELDEBILD</div>
+                            <span id="tag-type">UNKNOWN</span>
+                        </div>
+                        <div
+                            style="background: rgba(59,130,246,0.2); color: var(--accent-blue); padding: 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; flex:1;">
+                            <div style="font-size:0.6rem; opacity:0.7" data-i18n="tag_loc">ORT</div>
+                            <span id="tag-loc">UNKNOWN</span>
+                        </div>
+                    </div>
+                    <button onclick="startDeepAnalysis()" class="btn btn-primary" style="margin-top: 20px;">
+                        <i class="ri-cpu-line"></i> <span data-i18n="btn_start_dispatch">DISPOSITION STARTEN</span>
+                    </button>
+                </div>
+
+                <div style="margin-top: auto;">
+                    <button onclick="triggerRandomCall()" class="btn btn-ghost" id="sim-btn">
+                        <i class="ri-phone-line"></i> <span data-i18n="btn_sim_call">Notruf Simulieren</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="map-container">
+            <div id="map"></div>
+
+            <div id="squad-panel">
+                <div
+                    style="padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 1.2rem;" data-i18n="squad_title">Systemvorschlag</h2>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);" id="squad-subtitle"
+                            data-i18n="squad_wait">Warte auf
+                            Analyse...</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-weight: 800; font-size: 1.2rem; color: var(--accent-green);"
+                            id="squad-total-score">--%</div>
+                        <div style="font-size: 0.6rem; color: var(--text-muted);" data-i18n="squad_confidence">
+                            SYSTEMEINSCHÄTZUNG</div>
+                    </div>
+                </div>
+
+                <div id="squad-list" style="flex: 1; overflow-y: auto; padding-top: 15px;">
+                </div>
+
+                <div style="padding: 0 15px 15px 15px;">
+                    <button onclick="addOptionalUnit()" class="btn btn-ghost"
+                        style="border-style: dashed; border-color: var(--text-muted);">
+                        <i class="ri-add-circle-line"></i> <span data-i18n="btn_add_unit">Einheit hinzufügen</span>
+                    </button>
+                </div>
+
+                <div style="padding: 20px; border-top: 1px solid var(--border); background: rgba(0,0,0,0.3);">
+                    <button class="btn btn-primary" onclick="alert(t('alert_dispatched'))">
+                        <i class="ri-send-plane-fill"></i> <span data-i18n="btn_alarm">ALARMIEREN</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="sidebar-right">
+            <div class="sidebar-section">
+                <h4 style="margin:0; font-size:0.8rem; color:var(--text-muted);" data-i18n="fleet_status">FLOTTENSTATUS
+                </h4>
+            </div>
+            <div id="fleet-list-container"></div>
+        </div>
+    </div>
+
+    <div id="xai-modal" class="xai-modal-overlay">
+        <div class="xai-card">
+            <div class="close-modal" onclick="closeModal()">&times;</div>
+
+            <div class="xai-header">
+                <div>
+                    <div class="xai-title-label" data-i18n="modal_primary">SYSTEMVORSCHLAG (Primäre Option)</div>
+                    <div class="xai-unit-id" id="modal-id">---</div>
+                    <div style="display: flex; gap: 15px; color: var(--text-muted); font-size: 0.9rem;">
+                        <span><i class="ri-battery-charge-line"></i> <span id="modal-bat">-% Batterie</span></span>
+                        <span><i class="ri-check-double-line"></i> <span id="modal-status">Frei</span></span>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center;">
+                    <div class="xai-eta-big" id="modal-eta">-- min</div>
+                    <div style="text-align: right;">
+                        <div class="xai-score-big" id="modal-score">--%</div>
+                        <div class="xai-title-label" style="text-align: right;" data-i18n="modal_confidence">
+                            SYSTEMEINSCHÄTZUNG</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="xai-metrics">
+                <div class="metric-box">
+                    <div class="metric-header"><span data-i18n="metric_route">Route</span> <span class="metric-val"
+                            id="val-route">--</span>
+                    </div>
+                    <div class="progress-bg">
+                        <div class="progress-fill" id="bar-route" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-header"><span data-i18n="metric_equip">Ausrüstung</span> <span class="metric-val"
+                            id="val-equip">--</span>
+                    </div>
+                    <div class="progress-bg">
+                        <div class="progress-fill" id="bar-equip" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-header"><span data-i18n="metric_crew">Crew Status</span> <span class="metric-val"
+                            id="val-crew">--</span>
+                    </div>
+                    <div class="progress-bg">
+                        <div class="progress-fill" id="bar-crew" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="xai-content">
+                <div class="rationale-section">
+                    <div class="xai-title-label" data-i18n="ai_rationale">KI BEGRÜNDUNG</div>
+
+                    <div class="trust-box">
+                        <div
+                            style="color: var(--accent-blue); font-size: 0.75rem; font-weight: 800; text-transform: uppercase; margin-bottom: 5px;">
+                            <i class="ri-history-line"></i> <span data-i18n="trust_calib">VERTRAUENSKALIBRIERUNG</span>
+                        </div>
+                        <div style="font-size: 0.9rem; color: #dbeafe;" id="modal-trust-text">
+                            Loading history...
+                        </div>
+                    </div>
+
+                    <div id="modal-rationale-list">
+                    </div>
+
+                    <div class="sec-section">
+                        <div class="xai-title-label" data-i18n="sec_considerations">SEKUNDÄRE FAKTOREN</div>
+                        <div class="sec-grid">
+                            <div class="sec-item"><i class="ri-dashboard-3-line"></i><span id="sec-load">--</span></div>
+                            <div class="sec-item"><i class="ri-sun-foggy-line"></i><span id="sec-weather">--</span>
+                            </div>
+                            <div class="sec-item"><i class="ri-map-pin-range-line"></i><span id="sec-dist">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alt-list">
+                    <div class="xai-title-label" data-i18n="alternatives">ALTERNATIVEN</div>
+                    <div id="modal-alt-list">
+                    </div>
+                    <div class="expert-override-banner" data-i18n="expert_override">
+                        Abweichungen vom Systemvorschlag werden automatisch als <b>Expertenentscheidung</b>
+                        protokolliert.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        // Language Toggle Logic
+        const TRANSLATIONS = {
+            de: {
+                header_title: "LEITSTELLE INGOLSTADT",
+                header_subtitle: "COGNITIVE DISPATCH CORE v3.3 (Data: Original)",
+                live_input: "LIVE EINGANG",
+                system_ready: "System bereit...",
+                tag_type: "MELDEBILD",
+                tag_loc: "ORT",
+                btn_start_dispatch: "DISPOSITION STARTEN",
+                btn_sim_call: "Notruf Simulieren",
+                squad_title: "Systemvorschlag",
+                squad_wait: "Warte auf Analyse...",
+                squad_confidence: "SYSTEMEINSCHÄTZUNG",
+                squad_total: "GESAMT",
+                btn_add_unit: "Einheit hinzufügen",
+                btn_alarm: "ALARMIEREN",
+                fleet_status: "FLOTTENSTATUS",
+                modal_primary: "SYSTEMVORSCHLAG (Primäre Option)",
+                modal_confidence: "SYSTEMEINSCHÄTZUNG",
+                metric_route: "Route",
+                metric_equip: "Ausrüstung",
+                metric_crew: "Crew Status",
+                ai_rationale: "KI BEGRÜNDUNG",
+                trust_calib: "VERTRAUENSKALIBRIERUNG",
+                sec_considerations: "SEKUNDÄRE FAKTOREN",
+                sec_load: "Systemlast",
+                sec_weather: "Wetter",
+                sec_dist: "Distanz",
+                alternatives: "ALTERNATIVEN",
+                expert_override: "Abweichungen vom Systemvorschlag werden automatisch als <b>Expertenentscheidung</b> protokolliert.",
+                // Dynamic text keys
+                status_ready: "Einsatzbereit",
+                status_not_ready: "Nicht bereit",
+                status_disinfection: "Desinfektion",
+                status_approach: "Auf Anfahrt",
+                status_maintenance: "Wartung",
+                status_patrol: "Streife",
+                status_on_mission: "Im Einsatz",
+                status_standby: "Rufbereitschaft",
+                weather_clear: "Klar",
+                weather_rain: "Regen",
+                weather_fog: "Nebel",
+                load_normal: "Normal",
+                load_high: "Hoch",
+                load_low: "Niedrig",
+                qual_optimal: "Optimal",
+                qual_stable: "Stabil",
+                qual_limited: "Eingeschränkt",
+                qual_critical: "Kritisch",
+                equip_complete: "Vollständig",
+                equip_missing: "Fehlt",
+                crew_fresh: "Frisch",
+                crew_fatigued: "Ermüdet",
+                // Smart messages
+                msg_closer_equip: "Nähere Einheit ({id}) fehlt Ausrüstung.",
+                msg_closer_status: "Nähere Einheit ({id}) ist im Status {status}.",
+                msg_fresher_crew: "Gewählte Einheit hat deutlich frischere Crew als die nächste Option.",
+                msg_confidence: "Gewählt aufgrund höherer Gesamtbewertung trotz längerer Anfahrt.",
+                // Modal specific
+                modal_eta: "{val} min",
+                modal_bat: "{val}% Batterie",
+                modal_dist: "{val} km",
+                hist_text: "Diese Crew hat eine <b>{rate}% Pünktlichkeitsrate</b> für {spec} Einsätze.",
+                trend_improving: "↗ Verbessernd",
+                trend_declining: "↘ Verschlechternd",
+                rat_route_calc: "Berechnet",
+                rat_route_traffic: "{dist} km Entfernung",
+                rat_status_ready: "Einsatzbereit",
+                rat_status_not_ready: "Nicht bereit",
+                rat_crew_fatigue: "Ermüdet",
+                rat_crew_fresh: "Frisch",
+                rat_proto_mismatch: "Mismatch",
+                rat_proto_match: "Match",
+                rat_hist_spec: "Spezialist",
+                rat_hist_desc: "Einheit ist spezialisiert auf diesen Typ",
+                risk_lower_score: "Geringere Passung",
+                risk_fatigue: "Hohe Ermüdung",
+                risk_slower: "+{diff}m Anfahrt",
+                risk_equip: "Ausrüstung fehlt",
+                action_analyze: "Analysieren und Ändern",
+                action_deep_dive: "Deep Dive",
+                action_choose_expert: "Als Expertenentscheidung wählen",
+                confirm_override: "Möchten Sie {id} manuell als Expertenentscheidung setzen?",
+                alert_dispatched: "Einsatzmittel alarmiert und Daten übertragen.",
+                alert_manual_add: "Disponent kann hier manuell Einheiten hinzufügen (Polizei, Stadtwerke, etc.)."
+            },
+            en: {
+                header_title: "INGOLSTADT DISPATCH CENTER",
+                header_subtitle: "COGNITIVE DISPATCH CORE v3.3 (Data: Original)",
+                live_input: "LIVE INPUT",
+                system_ready: "System ready...",
+                tag_type: "INCIDENT TYPE",
+                tag_loc: "LOCATION",
+                btn_start_dispatch: "START DISPATCH",
+                btn_sim_call: "Simulate Call",
+                squad_title: "System Proposal",
+                squad_wait: "Waiting for analysis...",
+                squad_confidence: "SYSTEM CONFIDENCE",
+                squad_total: "TOTAL",
+                btn_add_unit: "Add Unit",
+                btn_alarm: "DISPATCH",
+                fleet_status: "FLEET STATUS",
+                modal_primary: "SYSTEM PROPOSAL (Primary Option)",
+                modal_confidence: "SYSTEM CONFIDENCE",
+                metric_route: "Route",
+                metric_equip: "Equipment",
+                metric_crew: "Crew State",
+                ai_rationale: "AI RATIONALE",
+                trust_calib: "TRUST CALIBRATION",
+                sec_considerations: "SECONDARY CONSIDERATIONS",
+                sec_load: "System Load",
+                sec_weather: "Weather",
+                sec_dist: "Distance",
+                alternatives: "ALTERNATIVES",
+                expert_override: "Deviations from the system proposal are automatically logged as <b>Expert Decisions</b>.",
+                // Dynamic text keys
+                status_ready: "Ready",
+                status_not_ready: "Not Ready",
+                status_disinfection: "Disinfection",
+                status_approach: "Approaching",
+                status_maintenance: "Maintenance",
+                status_patrol: "Patrol",
+                status_on_mission: "On Mission",
+                status_standby: "Standby",
+                weather_clear: "Clear",
+                weather_rain: "Rain",
+                weather_fog: "Fog",
+                load_normal: "Normal",
+                load_high: "High",
+                load_low: "Low",
+                qual_optimal: "Optimal",
+                qual_stable: "Stable",
+                qual_limited: "Limited",
+                qual_critical: "Critical",
+                equip_complete: "Complete",
+                equip_missing: "Missing",
+                crew_fresh: "Fresh",
+                crew_fatigued: "Fatigued",
+                // Smart messages
+                msg_closer_equip: "Closer unit ({id}) missing equipment.",
+                msg_closer_status: "Closer unit ({id}) is in status {status}.",
+                msg_fresher_crew: "Selected unit has significantly fresher crew than next option.",
+                msg_confidence: "Selected due to higher overall score despite longer travel time.",
+                // Modal specific
+                modal_eta: "{val} min",
+                modal_bat: "{val}% Battery",
+                modal_dist: "{val} km",
+                hist_text: "This crew has a <b>{rate}% on-time rate</b> for {spec} calls.",
+                trend_improving: "↗ Improving",
+                trend_declining: "↘ Declining",
+                rat_route_calc: "Calculated",
+                rat_route_traffic: "{dist} km Distance",
+                rat_status_ready: "Ready",
+                rat_status_not_ready: "Not Ready",
+                rat_crew_fatigue: "Fatigued",
+                rat_crew_fresh: "Fresh",
+                rat_proto_mismatch: "Mismatch",
+                rat_proto_match: "Match",
+                rat_hist_spec: "Specialist",
+                rat_hist_desc: "Unit specializes in this type",
+                risk_lower_score: "Lower Fit",
+                risk_fatigue: "High Fatigue",
+                risk_slower: "+{diff}m Travel",
+                risk_equip: "Equipment missing",
+                action_analyze: "Analyze and Change",
+                action_deep_dive: "Deep Dive",
+                action_choose_expert: "Select as Expert Decision",
+                confirm_override: "Do you want to manually set {id} as an expert decision?",
+                alert_dispatched: "Units dispatched and data transmitted.",
+                alert_manual_add: "Dispatcher can manually add units (Police, Utilities, etc.) here."
+            }
+        };
+
+        let currentLang = 'de';
+
+        function toggleLanguage() {
+            currentLang = currentLang === 'de' ? 'en' : 'de';
+            document.getElementById('lang-label').innerText = currentLang.toUpperCase();
+            updateTexts();
+        }
+
+        function t(key, params = {}) {
+            let text = TRANSLATIONS[currentLang][key] || key;
+            for (let param in params) {
+                text = text.replace(`{${param}}`, params[param]);
+            }
+            return text;
+        }
+
+        function updateTexts() {
+            // Update static elements with data-i18n attribute
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.innerHTML = t(el.getAttribute('data-i18n'));
+            });
+
+            // Re-render dynamic components if they are visible
+            if (document.getElementById('squad-list').innerHTML !== "") {
+                renderSquadList();
+            }
+            // Update modal if open
+            if (document.getElementById('xai-modal').style.display === 'flex' && window.currentOpenModalIndex !== undefined) {
+                openDeepDive(window.currentOpenModalIndex);
+            }
+        }
+
+        // ============================================================
+        // 1. DATA: REALISTIC DATA FOR INGOLSTADT
+        // ============================================================
+        const DISPATCH_PROTOCOLS = {
+            "Notarzteinsatz - Reanimation": {
+                units: ["RTW", "NEF"],
+                max_time: 8,
+                critical: true,
+                description: "Cardiac arrest with CPR in progress"
+            },
+            "Verkehrsunfall - Eingeklemmte Person": {
+                units: ["HLF", "RTW", "NEF"],
+                max_time: 10,
+                critical: true,
+                description: "Traffic accident with trapped persons"
+            },
+            "Wohnungsbrand": {
+                units: ["HLF", "DLK", "RTW", "ELW"],
+                max_time: 8,
+                critical: true,
+                description: "Apartment fire with persons at risk"
+            },
+            "Betriebsunfall": {
+                units: ["RTW", "NEF", "HLF"],
+                max_time: 12,
+                critical: true,
+                description: "Industrial accident at factory"
+            },
+            "Wasserrettung": {
+                units: ["RTW", "WLF"],
+                max_time: 10,
+                critical: true,
+                description: "Water rescue operation"
+            },
+            "Kindernotfall - Fieberkrampf": {
+                units: ["RTW", "NEF"],
+                max_time: 12,
+                critical: false,
+                description: "Pediatric emergency"
+            },
+            "Standard": {
+                units: ["RTW"],
+                max_time: 15,
+                critical: false,
+                description: "Standard medical emergency"
+            }
+        };
+
+        const EMERGENCIES = [
+            {
+                id: "E-2024-12547",
+                type: "Notarzteinsatz - Reanimation",
+                location: "Theresienstraße 15", // Matches perfectly
+                severity: "Lebensbedrohlich",
+                description: "Mann, 62 Jahre, bewusstlos. Reanimation durch Ersthelfer.",
+                required_equipment: "Defibrillator (Corpuls)",
+                caller_type: "Ersthelfer",
+                district: "Ingolstadt Innenstadt"
+            },
+            {
+                id: "E-2024-12548",
+                type: "Verkehrsunfall - Eingeklemmte Person",
+                location: "A9 Ausfahrt Ingolstadt-Süd", // Matches perfectly
+                severity: "Schwer",
+                description: "PKW gegen LKW. 1 Person eingeklemmt. Airbag ausgelöst.",
+                required_equipment: "Hydraulische Rettungsgeräte",
+                caller_type: "Unfallbeteiligter",
+                district: "Autobahn A9"
+            },
+            {
+                id: "E-2024-12549",
+                type: "Wohnungsbrand",
+                location: "Manchinger Straße 47", // REMOVED ", 3. OG" to match LOCATIONS
+                severity: "Lebensbedrohlich",
+                description: "Starke Rauchentwicklung aus Wohnung im 3. OG. Personen vermutet.",
+                required_equipment: "Wasser (1600L)",
+                caller_type: "Nachbar",
+                district: "Ingolstadt Nord"
+            },
+            {
+                id: "E-2024-12550",
+                type: "Betriebsunfall",
+                // You didn't have a location for this in LOCATIONS, so I mapped it to the nearest one
+                location: "Audi AG - Halle A1",
+                severity: "Schwer",
+                description: "Arbeitsunfall mit Maschine. Person verletzt, starke Blutung.",
+                required_equipment: "ALS-Ausstattung",
+                caller_type: "Werksarzt",
+                district: "Industriegebiet"
+            },
+            {
+                id: "E-2024-12551",
+                type: "Wasserrettung",
+                location: "Donau - Höhe Baggersee", // Corrected to match LOCATIONS key
+                severity: "Lebensbedrohlich",
+                description: "Person im Wasser treibend. Schwimmt nicht mehr.",
+                required_equipment: "Rettungsboot",
+                caller_type: "Zeuge",
+                district: "Donauufer"
+            },
+            {
+                id: "E-2024-12552",
+                type: "Kindernotfall - Fieberkrampf",
+                location: "Goethestraße 28", // Matches perfectly
+                severity: "Mittel",
+                description: "Kind, 3 Jahre, Fieberkrampf. Bei Bewusstsein, zittert.",
+                required_equipment: "Kindernotfallkoffer",
+                caller_type: "Mutter",
+                district: "Ingolstadt Südwest"
+            }
+        ];
+
+        const LOCATIONS = {
+            // --- FIXED MATCHES FOR FLEET ---
+            "Rettungswache Nord": [48.7690, 11.4180], // Removed "(BRK Zentrum)" to match fleet
+            "Rettungswache Ost": [48.7750, 11.4700],  // Removed "(Mailing)" to match fleet
+            "Donau - Höhe Baggersee Auwaldsee": [48.744245, 11.391780], // Renamed to match fleet
+
+            // --- NEW MISSING LOCATIONS ---
+            "Ingolstadt Südwest": [48.7360, 11.4050], // Approx location for Haunwöhr
+            "Ingolstadt Nord": [48.7850, 11.4400],    // Generic location for Inspection Service
+            // Wachen (Korrigiert)
+
+            "Rettungswache Süd": [48.7420, 11.4320], // Münchener Str. / Fauststr.
+
+            "Feuerwache Hauptwache": [48.7735, 11.4225], // Dreizehnerstraße
+            "Feuerwache Ost": [48.7680, 11.4520],
+            "Klinikum Ingolstadt": [48.7705, 11.3780], // Korrigiert: Krumenauerstr.
+            "Flugplatz Manching": [48.7155, 11.5336],
+            "DLRG Station Donau": [48.7580, 11.4300], // Stauseestr.
+            "Ingolstadt Innenstadt": [48.7665, 11.4258],
+
+            // Einsatzorte (Präzisiert)
+            "Theresienstraße 15": [48.7640, 11.4228],
+            "A9 Ausfahrt Ingolstadt-Süd": [48.7528, 11.4516], // Exakte Ausfahrt
+            "A9 - Ausfahrt Ingolstadt-Nord": [48.771963, 11.460753],
+            "Manchinger Straße 47": [48.755000, 11.448186], // Korrigiert (Südlich Donau)
+            "Audi AG - Halle A1": [48.785311, 11.414889],
+            "Donau - Höhe Baggersee": [48.744245, 11.391780],
+            "Goethestraße 28": [48.7730, 11.4480] // Korrigiert
+        };
+
+        // --- FLEET (Expanded Realistic Bavarian Emergency Vehicles) ---
+        const FLEET = [
+            // === RETTUNGSWAGEN (RTW) - Ambulances ===
+            {
+                id: "IN-RK 71/1",
+                type: "RTW",
+                status: "Einsatzbereit",
+                location: "Rettungswache Nord",
+                battery: 98,
+                crew: { shift_start: -2, calls_last_hour: 0, fatigue_score: 10, qualification: "Notfallsanitäter" },
+                equipment: ["Defibrillator (Corpuls)", "ALS-Ausstattung", "Kindernotfallkoffer", "Spineboard"],
+                history: { on_time_rate: 0.94, specialty: "Notarzteinsatz - Reanimation", trend: "improving", avg_response_time: 7.2 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Florian Ingolstadt 71/1"
+            },
+            {
+                id: "IN-RK 71/2",
+                type: "RTW",
+                status: "Auf Anfahrt",
+                location: "Klinikum Ingolstadt",
+                battery: 75,
+                crew: { shift_start: -11, calls_last_hour: 3, fatigue_score: 85, qualification: "Notfallsanitäter" },
+                equipment: ["Defibrillator (Corpuls)", "ALS-Ausstattung", "Vakuummatratze"],
+                history: { on_time_rate: 0.88, specialty: "Verkehrsunfall - Eingeklemmte Person", trend: "stable", avg_response_time: 8.5 },
+                gps: { last_update: 1, accuracy: "High" },
+                call_sign: "Florian Ingolstadt 71/2"
+            },
+            {
+                id: "IN-RK 71/3", // NEW
+                type: "RTW",
+                status: "Einsatzbereit",
+                location: "Rettungswache Nord",
+                battery: 100,
+                crew: { shift_start: -1, calls_last_hour: 0, fatigue_score: 5, qualification: "Rettungssanitäter + Notfallsanitäter" },
+                equipment: ["Defibrillator (Corpuls)", "ALS-Ausstattung", "Infektionsschutz"],
+                history: { on_time_rate: 0.95, specialty: "Standard", trend: "stable", avg_response_time: 6.5 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Florian Ingolstadt 71/3"
+            },
+            {
+                id: "IN-RK 72/1", // NEW
+                type: "RTW",
+                status: "Desinfektion", // Currently cleaning
+                location: "Rettungswache Süd",
+                battery: 60,
+                crew: { shift_start: -6, calls_last_hour: 2, fatigue_score: 40, qualification: "Notfallsanitäter" },
+                equipment: ["Defibrillator (Corpuls)", "ALS-Ausstattung"],
+                history: { on_time_rate: 0.90, specialty: "Standard", trend: "stable", avg_response_time: 8.0 },
+                gps: { last_update: 5, accuracy: "High" },
+                call_sign: "Florian Ingolstadt 72/1"
+            },
+            {
+                id: "IN-RK 73/1",
+                type: "RTW",
+                status: "Einsatzbereit",
+                location: "Rettungswache Ost",
+                battery: 95,
+                crew: { shift_start: -5, calls_last_hour: 1, fatigue_score: 30, qualification: "Notfallsanitäter" },
+                equipment: ["Defibrillator (Corpuls)", "ALS-Ausstattung", "Schaufeltrage"],
+                history: { on_time_rate: 0.91, specialty: "Standard", trend: "stable", avg_response_time: 9.1 },
+                gps: { last_update: 15, accuracy: "Low" },
+                call_sign: "Florian Ingolstadt 73/1"
+            },
+            {
+                id: "IN-RK 74/1",
+                type: "RTW",
+                status: "Einsatzbereit",
+                location: "Rettungswache Süd",
+                battery: 22,
+                crew: { shift_start: -3, calls_last_hour: 0, fatigue_score: 15, qualification: "Rettungssanitäter" },
+                equipment: ["Defibrillator (Corpuls)", "ALS-Ausstattung", "Beatmungsgerät"],
+                history: { on_time_rate: 0.89, specialty: "Standard", trend: "declining", avg_response_time: 10.2 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Florian Ingolstadt 74/1"
+            },
+            {
+                id: "MHD-IN 1", // NEW (Malteser Hilfsdienst)
+                type: "RTW",
+                status: "Einsatzbereit",
+                location: "Ingolstadt Innenstadt",
+                battery: 88,
+                crew: { shift_start: -4, calls_last_hour: 0, fatigue_score: 20, qualification: "Notfallsanitäter" },
+                equipment: ["Defibrillator (LP15)", "ALS-Ausstattung", "Kindernotfallkoffer"],
+                history: { on_time_rate: 0.93, specialty: "Kindernotfall - Fieberkrampf", trend: "improving", avg_response_time: 5.5 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Johannes Ingolstadt 71/5"
+            },
+            // === KRANKENTRANSPORTWAGEN (KTW) - Patient Transport ===
+            // Useful as backup for "Standard" calls
+            {
+                id: "IN-RK 72/70", // NEW
+                type: "KTW", // Can handle basic "Standard" calls if needed
+                status: "Einsatzbereit",
+                location: "Rettungswache Süd",
+                battery: 90,
+                crew: { shift_start: -2, calls_last_hour: 1, fatigue_score: 15, qualification: "Rettungssanitäter" },
+                equipment: ["AED", "Tragestuhl", "Sauerstoff"],
+                history: { on_time_rate: 0.96, specialty: "Standard", trend: "stable", avg_response_time: 12.0 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Rotkreuz Ingolstadt 72/70"
+            },
+            // === NOTARZTEINSATZFAHRZEUG (NEF) - Emergency Doctor Vehicles ===
+            {
+                id: "IN-NEF 10/1",
+                type: "NEF",
+                status: "Einsatzbereit",
+                location: "Rettungswache Nord",
+                battery: 100,
+                crew: { shift_start: -4, calls_last_hour: 0, fatigue_score: 20, qualification: "Notarzt + Notfallsanitäter" },
+                equipment: ["Notarztkoffer", "Medikamente (Narkotika)", "Beatmungsgerät", "EKG-Monitor", "Absaugpumpe"],
+                history: { on_time_rate: 0.98, specialty: "Notarzteinsatz - Reanimation", trend: "stable", avg_response_time: 6.8 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Christoph Ingolstadt NEF 10/1"
+            },
+            {
+                id: "IN-NEF 20/1",
+                type: "NEF",
+                status: "Im Einsatz",
+                location: "A9 - Ausfahrt Ingolstadt-Nord",
+                battery: 50,
+                crew: { shift_start: -6, calls_last_hour: 2, fatigue_score: 45, qualification: "Notarzt + Notfallsanitäter" },
+                equipment: ["Defibrilator", "Notarztkoffer", "Medikamente (Narkotika)", "Beatmungsgerät", "EKG-Monitor"],
+                history: { on_time_rate: 0.92, specialty: "Verkehrsunfall - Eingeklemmte Person", trend: "improving", avg_response_time: 7.9 },
+                gps: { last_update: 2, accuracy: "High" },
+                call_sign: "Christoph Ingolstadt NEF 20/1"
+            },
+            {
+                id: "IN-NEF 30/1",
+                type: "NEF",
+                status: "Einsatzbereit",
+                location: "Rettungswache Nord",
+                battery: 100,
+                crew: { shift_start: -4, calls_last_hour: 0, fatigue_score: 20, qualification: "Notarzt + Notfallsanitäter" },
+                equipment: ["Notarztkoffer", "Medikamente (Narkotika)", "Beatmungsgerät", "EKG-Monitor", "Absaugpumpe"],
+                history: { on_time_rate: 0.98, specialty: "Notarzteinsatz - Reanimation", trend: "stable", avg_response_time: 6.8 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Christoph Ingolstadt NEF 10/1"
+            },
+            {
+                id: "IN-NEF 76/1", // NEW
+                type: "NEF",
+                status: "Einsatzbereit",
+                location: "Klinikum Ingolstadt",
+                battery: 95,
+                crew: { shift_start: 0, calls_last_hour: 0, fatigue_score: 0, qualification: "Notarzt + Notfallsanitäter" },
+                equipment: ["Notarztkoffer", "Medikamente (Narkotika)", "Ultraschall", "Lucas-Reanimationshilfe"],
+                history: { on_time_rate: 0.99, specialty: "Notarzteinsatz - Reanimation", trend: "stable", avg_response_time: 4.5 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Florian Ingolstadt NEF 76/1"
+            },
+            // === HILFELEISTUNGSLÖSCHFAHRZEUG (HLF) - Fire Trucks ===
+            {
+                id: "IN-HLF 1-40",
+                type: "HLF",
+                status: "Einsatzbereit",
+                location: "Feuerwache Hauptwache",
+                battery: 90,
+                crew: { shift_start: -8, calls_last_hour: 0, fatigue_score: 35, qualification: "Berufsfeuerwehr" },
+                equipment: ["Hydraulische Rettungsgeräte", "Wasser (1600L)", "Schaummittel", "Atemschutzgeräte"],
+                history: { on_time_rate: 0.96, specialty: "Verkehrsunfall - Eingeklemmte Person", trend: "stable", avg_response_time: 5.4 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Florian Ingolstadt 1-40"
+            },
+            {
+                id: "IN-HLF 1-40-2", // NEW (Backup HLF at main station)
+                type: "HLF",
+                status: "Einsatzbereit",
+                location: "Feuerwache Hauptwache",
+                battery: 85,
+                crew: { shift_start: -8, calls_last_hour: 0, fatigue_score: 35, qualification: "Berufsfeuerwehr" },
+                equipment: ["Hydraulische Rettungsgeräte", "Wasser (2000L)", "Sprungretter", "Atemschutzgeräte"],
+                history: { on_time_rate: 0.94, specialty: "Wohnungsbrand", trend: "stable", avg_response_time: 5.9 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Florian Ingolstadt 1-40-2"
+            },
+            {
+                id: "IN-HLF 2-40",
+                type: "HLF",
+                status: "Einsatzbereit",
+                location: "Feuerwache Ost",
+                battery: 88,
+                crew: { shift_start: -4, calls_last_hour: 1, fatigue_score: 25, qualification: "Berufsfeuerwehr" },
+                equipment: ["Hydraulische Rettungsgeräte", "Wasser (1600L)", "Schaummittel", "Atemschutzgeräte"],
+                history: { on_time_rate: 0.94, specialty: "Wohnungsbrand", trend: "improving", avg_response_time: 6.1 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Florian Ingolstadt 2-40"
+            },
+            {
+                id: "IN-HLF 3-41", // NEW (Volunteer Fire Dept - Freiwillige Feuerwehr)
+                type: "HLF",
+                status: "Einsatzbereit",
+                location: "Ingolstadt Südwest", // Virtual location for FF
+                battery: 98,
+                crew: { shift_start: 0, calls_last_hour: 0, fatigue_score: 5, qualification: "Freiwillige Feuerwehr" },
+                equipment: ["Hydraulische Rettungsgeräte", "Wasser (1200L)", "Kettensäge"],
+                history: { on_time_rate: 0.85, specialty: "Standard", trend: "stable", avg_response_time: 9.5 }, // Slower due to volunteers driving to station
+                gps: { last_update: 0, accuracy: "Medium" },
+                call_sign: "Florian Haunwöhr 41/1"
+            },
+            // === EINSATZLEITWAGEN (ELW) - Command ===
+            {
+                id: "IN-ELW 1",
+                type: "ELW",
+                status: "Einsatzbereit",
+                location: "Feuerwache Hauptwache",
+                battery: 95,
+                crew: { shift_start: -1, calls_last_hour: 0, fatigue_score: 5, qualification: "Einsatzleiter" },
+                equipment: ["Funkanlage (Digital)", "Lagekarten", "Führungsmittel", "Laptop"],
+                history: { on_time_rate: 0.99, specialty: "Wohnungsbrand", trend: "stable", avg_response_time: 4.2 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Florian Ingolstadt ELW 1"
+            },
+            {
+                id: "IN-KdoW 2", // NEW (Command Car - Kommandowagen)
+                type: "ELW", // Treated as ELW for logic
+                status: "Streife", // On inspection
+                location: "Ingolstadt Nord",
+                battery: 70,
+                crew: { shift_start: -5, calls_last_hour: 1, fatigue_score: 20, qualification: "Inspektionsdienst" },
+                equipment: ["Funkanlage (Digital)", "Führungsmittel"],
+                history: { on_time_rate: 0.95, specialty: "Betriebsunfall", trend: "improving", avg_response_time: 5.0 },
+                gps: { last_update: 2, accuracy: "High" },
+                call_sign: "Florian Ingolstadt 10/1"
+            },
+            // === DREHLEITER (DLK) - Aerial Ladder ===
+            {
+                id: "IN-DLK 1-33",
+                type: "DLK",
+                status: "Einsatzbereit",
+                location: "Feuerwache Hauptwache",
+                battery: 92,
+                crew: { shift_start: -7, calls_last_hour: 0, fatigue_score: 40, qualification: "Berufsfeuerwehr" },
+                equipment: ["Drehleiter (33m)", "Rettungskorb", "Löschmonitor", "Atemschutzgeräte"],
+                history: { on_time_rate: 0.97, specialty: "Wohnungsbrand", trend: "stable", avg_response_time: 5.8 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Florian Ingolstadt DLK 1-33"
+            },
+            // === RETTUNGSHUBSCHRAUBER (RTH) - Air Rescue ===
+            {
+                id: "Christoph 32",
+                type: "RTH",
+                status: "Einsatzbereit",
+                location: "Flugplatz Manching",
+                battery: 100,
+                crew: { shift_start: -3, calls_last_hour: 0, fatigue_score: 15, qualification: "Pilot + Notarzt + TC HEMS" },
+                equipment: ["Notarztausrüstung", "Rettungswinde", "Trauma-Kit", "Beatmungsgerät"],
+                history: { on_time_rate: 0.85, specialty: "Betriebsunfall", trend: "stable", avg_response_time: 12.5 },
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Christoph 32"
+            },
+            // === WASSERRETTUNG (WLF/GW-W) ===
+            {
+                id: "DLRG-IN 8/1",
+                type: "WLF",
+                status: "Rufbereitschaft",
+                location: "DLRG Station Donau",
+                battery: 85,
+                crew: { shift_start: 0, calls_last_hour: 0, fatigue_score: 5, qualification: "Wasserretter" },
+                equipment: ["Rettungsboot", "Tauchausrüstung", "Wurfleine", "Schwimmwesten"],
+                history: { on_time_rate: 0.82, specialty: "Wasserrettung", trend: "stable", avg_response_time: 15.5 },
+                gps: { last_update: 30, accuracy: "Low" },
+                call_sign: "DLRG Ingolstadt 8/1"
+            },
+            {
+                id: "WW-IN 91/1", // NEW (Wasserwacht - Water Rescue)
+                type: "WLF",
+                status: "Einsatzbereit", // Active at the lake
+                location: "Donau - Höhe Baggersee Auwaldsee",
+                battery: 90,
+                crew: { shift_start: -4, calls_last_hour: 0, fatigue_score: 25, qualification: "Rettungsschwimmer" },
+                equipment: ["Rettungsboot", "Sonar", "Wurfleine"],
+                history: { on_time_rate: 0.98, specialty: "Wasserrettung", trend: "improving", avg_response_time: 2.0 }, // Very fast as already on site
+                gps: { last_update: 0, accuracy: "High" },
+                call_sign: "Wasserwacht Ingolstadt 91/1"
+            }
+        ];
+
+        // --- STATE ---
+        let map, currentIncident, currentSquad = [];
+        let currentWorldState = { weather: "Clear", traffic: "Free", hospital: "Open", load: 4 };
+        let markersGroup = L.layerGroup(); // Group for markers to allow easy clearing
+
+        // ============================================================
+        // 2. INITIALIZATION
+        // ============================================================
+        function init() {
+            map = L.map('map').setView([48.7665, 11.4258], 13);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 20
+            }).addTo(map);
+            markersGroup.addTo(map); // Add the group to the map
+
+            // Add static locations
+            renderStaticLocations();
+            updateMapMarkers(); // Initial fleet render
+            renderFleetStatus(); // Sidebar list
+        }
+
+        function renderStaticLocations() {
+            // Render specific locations like Hospitals and Stations
+            for (const [name, coords] of Object.entries(LOCATIONS)) {
+                let iconClass = 'icon-station';
+                let iconHtml = '<i class="ri-building-2-line"></i>';
+
+                if (name.includes("Klinikum")) {
+                    iconClass = 'icon-hospital';
+                    iconHtml = '<i class="ri-hospital-line"></i>';
+                } else if (name.includes("Wache") || name.includes("Feuerwache")) {
+                    // Default station style
+                } else {
+                    continue; // Skip street addresses or generic areas
+                }
+
+                const icon = L.divIcon({
+                    className: `map-icon ${iconClass} static-loc-marker`,
+                    html: iconHtml,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+
+                L.marker(coords, { icon: icon }).addTo(map).bindPopup(`<b>${name}</b>`);
+            }
+        }
+
+        function updateMapMarkers() {
+            markersGroup.clearLayers();
+
+            FLEET.forEach(u => {
+                const loc = LOCATIONS[u.location];
+                if (!loc) return;
+
+                let iconHtml = '<i class="ri-car-line"></i>';
+                if (u.type.includes('RTW') || u.type.includes('KTW')) iconHtml = '<i class="ri-taxi-line"></i>';
+                if (u.type.includes('HLF') || u.type.includes('DLK')) iconHtml = '<i class="ri-truck-line"></i>';
+                if (u.type.includes('RTH')) iconHtml = '<i class="ri-flight-takeoff-line"></i>';
+                if (u.type.includes('WLF')) iconHtml = '<i class="ri-ship-line"></i>';
+                if (u.type.includes('NEF')) iconHtml = '<i class="ri-heart-pulse-line"></i>';
+
+                let statusClass = 'status-ready';
+                if (u.status === 'Im Einsatz' || u.status === 'Auf Anfahrt') statusClass = 'status-busy';
+                if (u.status === 'Desinfektion' || u.status === 'Wartung') statusClass = 'status-maint';
+
+                // HIGHLIGHT LOGIC FIXED
+                let highlightClass = '';
+                let zOffset = 0; // Default Z-Index offset
+
+                // Check if this unit's ID exists in any selected slot of the current squad
+                // Ensure currentSquad is defined before checking
+                if (typeof currentSquad !== 'undefined' && currentSquad.length > 0) {
+                    const isInSquad = currentSquad.some(slot => slot.selected.unit.id === u.id);
+                    if (isInSquad) {
+                        highlightClass = 'squad-highlight';
+                        zOffset = 1000; // FORCE to top of stack
+                    }
+                }
+
+                // Jitter (Random offset so cars at same station don't stack perfectly)
+                const offsetLat = (Math.random() - 0.5) * 0.0008;
+                const offsetLng = (Math.random() - 0.5) * 0.0008;
+                const jitteredLoc = [loc[0] + offsetLat, loc[1] + offsetLng];
+
+                const icon = L.divIcon({
+                    className: `map-icon fleet-marker ${statusClass} ${highlightClass}`,
+                    html: iconHtml,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14],
+                    // If we don't handle tooltip anchoring, animations can look off-center
+                    popupAnchor: [0, -10]
+                });
+
+                L.marker(jitteredLoc, {
+                    icon: icon,
+                    zIndexOffset: zOffset // Apply the Z-Index boost here
+                }).addTo(markersGroup).bindPopup(`<b>${u.call_sign}</b><br>${u.type} - ${u.status}`);
+            });
+        }
+        function renderFleetStatus() {
+            const list = document.getElementById('fleet-list-container');
+            list.innerHTML = FLEET.map(u => {
+                let color = '#10b981'; // Green
+                if (u.status === 'Im Einsatz' || u.status === 'Auf Anfahrt') color = '#ef4444'; // Red
+                if (u.status === 'Desinfektion' || u.status === 'Wartung') color = '#f59e0b'; // Orange
+
+                return `
+                <div class="fleet-item">
+                    <span class="fleet-status-dot" style="background:${color}"></span>
+                    <strong>${u.id}</strong> <span style="color:#64748b">(${u.type})</span>
+                </div>
+            `}).join('');
+        }
+
+        // ============================================================
+        // 3. LOGIC: SIMULATION
+        // ============================================================
+        function triggerRandomCall() {
+            document.getElementById('sim-btn').disabled = true;
+            document.getElementById('detected-tags').style.opacity = 0;
+            document.getElementById('squad-panel').style.display = 'none';
+
+            // FORCE a random scenario
+            currentIncident = EMERGENCIES[Math.floor(Math.random() * EMERGENCIES.length)];
+            const fullText = `Notruf 112... ${currentIncident.description}... Ort: ${currentIncident.location}...`;
+
+            const el = document.getElementById('asr-text');
+            el.innerText = "";
+            let i = 0;
+            const interval = setInterval(() => {
+                el.innerText += fullText.charAt(i);
+                i++;
+                if (i >= fullText.length) {
+                    clearInterval(interval);
+                    setTimeout(() => showDetection(), 500);
+                }
+            }, 30);
+        }
+
+        function showDetection() {
+            document.getElementById('tag-type').innerText = currentIncident.type;
+            document.getElementById('tag-loc').innerText = currentIncident.location;
+            document.getElementById('detected-tags').style.opacity = 1;
+
+            const loc = LOCATIONS[currentIncident.location];
+
+            if (loc) {
+                if (window.incidentMarker) map.removeLayer(window.incidentMarker);
+
+                const pulseIcon = L.divIcon({
+                    className: 'emergency-marker-wrapper', // Use the STATIC wrapper class
+                    // Put the ANIMATED class inside the HTML
+                    html: '<div class="emergency-pulse-inner"><i class="ri-alarm-warning-fill"></i></div>',
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20],
+                    popupAnchor: [0, -25]
+                });
+
+                window.incidentMarker = L.marker(loc, {
+                    icon: pulseIcon,
+                    zIndexOffset: 2000
+                })
+                    .addTo(map)
+                    .bindPopup(`<b>EINSATZORT</b><br>${currentIncident.description}`)
+                    .openPopup();
+
+                map.setView(loc, 14);
+            }
+        }
+
+        // ============================================================
+        // 4. LOGIC: DEEP ANALYSIS (UPDATED FOR REAL DATA & SMART EXPLANATIONS)
+        // ============================================================
+        function startDeepAnalysis() {
+            document.getElementById('squad-panel').style.display = 'flex';
+            document.getElementById('squad-subtitle').innerText = `Stichwort: ${currentIncident.type}`;
+
+            calculateSquad();
+            renderSquadList();
+            updateMapMarkers(); // Update map to show highlights
+            document.getElementById('sim-btn').disabled = false;
+        }
+
+        function calculateSquad() {
+            // Get Protocol
+            const protocol = DISPATCH_PROTOCOLS[currentIncident.type] || DISPATCH_PROTOCOLS["Standard"];
+            currentSquad = [];
+
+            // 1. Hole Koordinaten des Einsatzortes (Notfall)
+            // Falls currentIncident.coords direkt existiert nutzen, sonst via LOCATIONS lookup
+            let emergencyCoords = currentIncident.coords;
+            if (!emergencyCoords && LOCATIONS[currentIncident.location]) {
+                emergencyCoords = LOCATIONS[currentIncident.location];
+            }
+
+            protocol.units.forEach(reqRole => {
+                // Find candidates
+                let candidates = FLEET.filter(u => u.type.includes(reqRole));
+
+                let scoredCandidates = candidates.map(u => {
+                    let score = 100;
+                    let rationale = [];
+
+                    // 2. Hole Koordinaten der Einheit
+                    // Wir schauen im LOCATIONS Objekt nach dem Namen (u.location)
+                    // Oder nutzen u.coords falls im Datensatz vorhanden
+                    let unitCoords = u.coords || LOCATIONS[u.location];
+
+                    // Distance Calculation
+                    let distKm = 0;
+                    let eta = 0;
+
+                    if (emergencyCoords && unitCoords) {
+                        const dy = (emergencyCoords[0] - unitCoords[0]) * 111.19;
+                        const dx = (emergencyCoords[1] - unitCoords[1]) * 111.19 * Math.cos(emergencyCoords[0] * (Math.PI / 180));
+                        distKm = Math.sqrt(dx * dx + dy * dy);
+
+                        // Use 1 decimal place for score calculation, but display integer later
+                        // Formula: (Dist * 1.5 mins/km) + 0.5 min turnout
+                        eta = (distKm * 1.5) + 0.5;
+                    } else {
+                        // Fallback falls Daten fehlen
+                        eta = 15;
+                        rationale.push({ type: 'neg', label: 'GPS', val: 'Error', sub: 'Keine Daten' });
+                    }
+
+                    // Formatierung für Anzeige
+                    distKm = distKm.toFixed(1);
+
+                    // --- Simulation für Demo-Zwecke ---
+                    // Wenn es der "Sabotage-Fall" ist (IN-RK 71/2 soll näher wirken aber schlecht sein)
+                    if (u.id === "IN-RK 71/2") {
+                        // Wir manipulieren die ETA hier NICHT künstlich nach oben, 
+                        // damit er wirklich als "schneller aber schlechter" erkannt wird.
+                    }
+
+                    // Weather Penalty
+                    if (currentWorldState.weather === "Rain") eta += 1;
+                    if (currentWorldState.weather === "Fog") eta += 3;
+
+                    // Penalties berechnen
+                    score -= (eta * 4); // Stärkere Gewichtung der Zeit
+                    rationale.push({ type: 'pos', label: 'Route', val: t('rat_route_calc'), sub: t('rat_route_traffic', { dist: distKm }) });
+
+                    if (u.status !== 'Einsatzbereit') {
+                        score -= 50;
+                        rationale.push({ type: 'neg', label: 'Status', val: t('rat_status_not_ready'), sub: u.status });
+                    }
+
+                    if (u.crew.fatigue_score > 40) {
+                        score -= 25; // Erhöhte Strafe damit Smart-Explanation triggert
+                        rationale.push({ type: 'neg', label: 'Crew', val: t('rat_crew_fatigue'), sub: 'Hohe Belastung' });
+                    } else {
+                        rationale.push({ type: 'pos', label: 'Crew', val: t('rat_crew_fresh'), sub: 'Geringe Last' });
+                    }
+
+                    // Equip Check
+                    let equipScore = 100;
+                    const reqEquip = currentIncident.required_equipment;
+
+                    if (reqEquip) {
+                        // Check if capability matches unit type
+                        const isFireUnit = u.type.includes("HLF") || u.type.includes("DLK") || u.type.includes("TLF") || u.type.includes("RW");
+                        const isMedUnit = u.type.includes("RTW") || u.type.includes("NEF") || u.type.includes("KTW");
+
+                        const reqIsFire = reqEquip.includes("Wasser") || reqEquip.includes("Hydraulik") || reqEquip.includes("Leiter") || reqEquip.includes("Kettensäge");
+                        const reqIsMed = reqEquip.includes("Corpuls") || reqEquip.includes("Medikamente") || reqEquip.includes("Notarzt");
+
+                        let shouldCheck = true;
+                        if (reqIsFire && !isFireUnit) shouldCheck = false; // Don't check Ambulance for Water
+                        if (reqIsMed && !isMedUnit) shouldCheck = false;   // Don't check Fire truck for Meds
+
+                        // Squad Synergy Check: Does anyone else ALREADY selected have it?
+                        const squadHasIt = currentSquad.some(slot => slot.selected.unit.equipment.includes(reqEquip));
+
+                        if (squadHasIt) {
+                            shouldCheck = false; // Someone else has it, I don't need it
+                            rationale.push({ type: 'pos', label: 'Squad', val: 'Synergy', sub: 'Covered by squad' });
+                        }
+
+                        if (shouldCheck && !u.equipment.includes(reqEquip)) {
+                            score -= 40;
+                            equipScore = 40;
+                            rationale.push({ type: 'neg', label: 'Protokoll', val: t('rat_proto_mismatch'), sub: `Fehlt: ${reqEquip}` });
+                        } else if (shouldCheck) {
+                            rationale.push({ type: 'pos', label: 'Protokoll', val: t('rat_proto_match'), sub: 'Ausrüstung komplett' });
+                        }
+                    }
+
+                    // Clamp Score (5-99)
+                    score = Math.min(Math.max(Math.round(score), 5), 99);
+
+                    // Range
+                    let variance = Math.floor(Math.random() * 4) + 2;
+                    let range = `${Math.max(0, score - variance)}–${Math.min(100, score + variance)}%`;
+
+                    return {
+                        unit: u,
+                        score: Math.round(score), // Round final score
+                        range,
+                        eta: Math.ceil(eta), // Round ETA for Display only
+                        rawEta: eta, // KEEP RAW ETA FOR COMPARISON
+                        dist: distKm,
+                        rationale,
+                        metrics: { route: Math.max(100 - eta * 5, 10), equip: equipScore, crew: 100 - u.crew.fatigue_score }
+                    };
+                });
+
+                // Sortieren nach Score
+                scoredCandidates.sort((a, b) => b.score - a.score);
+
+                // --- SMART EXPLANATION LOGIC ---
+                const selected = scoredCandidates[0];
+                let smartMsg = null;
+
+                // Suche eine Einheit, die SCHNELLER (kleinere ETA) ist, aber NICHT gewählt wurde
+                const fasterSkipped = scoredCandidates.find(c => c.rawEta < selected.rawEta && c.unit.id !== selected.unit.id);
+                if (fasterSkipped) {
+                    if (fasterSkipped.metrics.equip < 100) {
+                        smartMsg = t('msg_closer_equip', { id: fasterSkipped.unit.id });
+                    } else if (fasterSkipped.unit.status !== 'Einsatzbereit') {
+                        smartMsg = t('msg_closer_status', { id: fasterSkipped.unit.id, status: fasterSkipped.unit.status });
+                    } else if (selected.metrics.crew > fasterSkipped.metrics.crew + 20) {
+                        smartMsg = t('msg_fresher_crew');
+                    } else {
+                        smartMsg = t('msg_confidence');
+                    }
+                }
+
+                currentSquad.push({ role: reqRole, selected, smartMsg, alternatives: scoredCandidates });
+            });
+
+            // Durchschnitt berechnen
+            const total = currentSquad.length > 0 ? Math.round(currentSquad.reduce((acc, curr) => acc + curr.selected.score, 0) / currentSquad.length) : 0;
+            document.getElementById('squad-total-score').innerText = `~${total}%`;
+        }
+
+        function renderSquadList() {
+            const list = document.getElementById('squad-list');
+            list.innerHTML = "";
+
+            currentSquad.forEach((slot, index) => {
+                const data = slot.selected;
+                const color = data.score > 80 ? 'var(--accent-green)' : (data.score > 50 ? 'var(--accent-orange)' : 'var(--accent-red)');
+                const borderClass = data.score < 60 ? 'warning-border' : '';
+
+                const div = document.createElement('div');
+                div.className = `slot-card ${borderClass}`;
+                div.onclick = () => openDeepDive(index);
+
+                const msgHtml = slot.smartMsg ?
+                    `<div class="smart-explanation"><i class="ri-lightbulb-flash-line"></i> ${slot.smartMsg}</div>` : '';
+
+                div.innerHTML = `
+                    <div class="slot-role">${slot.role}</div>
+                    <div class="slot-main">
+                        <div class="slot-id">${data.unit.id}</div>
+                        <div class="slot-conf" style="color:${color}">${data.range}</div>
+                    </div>
+                    <div style="font-size:0.8rem; color:var(--text-muted); margin-top:5px; display:flex; justify-content:space-between;">
+                        <span><i class="ri-timer-flash-line"></i> ${t('modal_eta', { val: data.eta })}</span>
+                        <span style="color:${color}"><i class="ri-search-eye-line"></i> ${t('action_deep_dive')}</span>
+                    </div>
+                    ${msgHtml}
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function addOptionalUnit() {
+            alert(t('alert_manual_add'));
+        }
+
+        // ============================================================
+        // 5. UI: DEEP DIVE MODAL
+        // ============================================================
+        window.currentOpenModalIndex = undefined;
+
+        function openDeepDive(index) {
+            window.currentOpenModalIndex = index;
+            const slot = currentSquad[index];
+            const data = slot.selected;
+
+            document.getElementById('modal-id').innerText = data.unit.id;
+            document.getElementById('modal-eta').innerText = t('modal_eta', { val: data.eta });
+            document.getElementById('modal-bat').innerText = t('modal_bat', { val: data.unit.battery });
+
+            // translate status if possible or fallback
+            let statusKey = 'status_' + data.unit.status.toLowerCase().replace(' ', '_');
+            let statusText = TRANSLATIONS[currentLang][statusKey] ? t(statusKey) : data.unit.status;
+            document.getElementById('modal-status').innerText = statusText;
+
+            document.getElementById('modal-score').innerText = data.range;
+            document.getElementById('modal-score').style.color = getScoreColor(data.score);
+
+            updateBar('route', data.metrics.route, getQualitativeLabel(data.metrics.route));
+            updateBar('equip', data.metrics.equip, data.metrics.equip === 100 ? t('equip_complete') : t('equip_missing'));
+            updateBar('crew', data.metrics.crew, getQualitativeLabel(data.metrics.crew));
+
+            document.getElementById('modal-trust-text').innerHTML = t('hist_text', { rate: Math.round(data.unit.history.on_time_rate * 100), spec: data.unit.history.specialty }) + ` <span style="color:var(--accent-green)">${t('trend_improving')}</span>`;
+
+            const ratList = document.getElementById('modal-rationale-list');
+            ratList.innerHTML = data.rationale.map(r => `
+                <div class="rationale-item">
+                    <div class="rat-head">
+                        <span>${r.label}</span>
+                        <span class="rat-status" style="color:${r.type === 'pos' ? 'var(--accent-green)' : 'var(--accent-red)'}">
+                            ${r.type === 'pos' ? '<i class="ri-check-line"></i>' : '<i class="ri-alert-line"></i>'} ${r.val}
+                        </span>
+                    </div>
+                    <div class="rat-desc" style="border-color:${r.type === 'pos' ? 'var(--accent-green)' : 'var(--accent-red)'}">
+                        ${r.sub}
+                    </div>
+                </div>
+            `).join('');
+
+            // Secondary
+            let loadKey = 'load_normal';
+            if (currentWorldState.load > 6) loadKey = 'load_high';
+            if (currentWorldState.load < 3) loadKey = 'load_low';
+
+            let weatherKey = 'weather_' + currentWorldState.weather.toLowerCase();
+
+            document.getElementById('sec-load').innerText = `${t('sec_load')}: ${t(loadKey)} (${currentWorldState.load}/10)`;
+            document.getElementById('sec-weather').innerText = `${t('sec_weather')}: ${t(weatherKey)}`;
+            document.getElementById('sec-dist').innerText = `${t('sec_dist')}: ${t('modal_dist', { val: data.dist })}`;
+
+            const altList = document.getElementById('modal-alt-list');
+            altList.innerHTML = slot.alternatives.slice(1).map(alt => {
+                const etaDiff = alt.eta - data.eta;
+                let riskText = t('risk_lower_score');
+                let icon = "ri-arrow-down-line";
+                let colorClass = "";
+
+                if (alt.unit.status !== 'Einsatzbereit') {
+                    riskText = `${t('status_not_ready')}: ` + alt.unit.status;
+                    colorClass = "warn-red";
+                    icon = "ri-error-warning-fill";
+                }
+                else if (alt.metrics.equip < 100) {
+                    riskText = t('risk_equip');
+                    colorClass = "warn-orange";
+                    icon = "ri-alert-fill";
+                }
+                else if (etaDiff > 2) {
+                    riskText = t('risk_slower', { diff: etaDiff });
+                    colorClass = "warn-orange";
+                    icon = "ri-timer-line";
+                }
+
+                return `
+                    <div class="alt-card" onclick="swapUnit(${index}, '${alt.unit.id}')">
+                        <div class="alt-header">
+                            <span style="font-weight:700">${alt.unit.id}</span>
+                            <span style="font-weight:800; color:${getScoreColor(alt.score)}">${alt.range}</span>
+                        </div>
+                        <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:5px;">
+                            ${t('risk_slower', { diff: etaDiff > 0 ? etaDiff : 0 })}
+                        </div>
+                        <div style="font-size:0.85rem; display:flex; align-items:center; gap:5px; margin-bottom:8px;" class="${colorClass}">
+                            <i class="${icon}"></i> ${riskText}
+                        </div>
+                        <div style="font-size:0.75rem; text-align:right; font-weight:600; color:var(--accent-blue);">
+                            <i class="ri-user-settings-line"></i> ${t('action_choose_expert')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            if (slot.alternatives.length === 1) {
+                altList.innerHTML = "<div style='color:gray; font-style:italic;'>No alternatives available.</div>";
+            }
+
+            document.getElementById('xai-modal').style.display = 'flex';
+        }
+
+        function swapUnit(slotIndex, unitId) {
+            if (!confirm(t('confirm_override', { id: unitId }))) return;
+
+            const slot = currentSquad[slotIndex];
+            const newSelected = slot.alternatives.find(a => a.unit.id === unitId);
+
+            slot.selected = newSelected;
+            slot.smartMsg = null;
+            slot.alternatives.sort((a, b) => b.score - a.score);
+
+            renderSquadList();
+            updateMapMarkers(); // Re-highlight
+            closeModal();
+        }
+
+        function getQualitativeLabel(score) {
+            if (score >= 90) return t('qual_optimal');
+            if (score >= 70) return t('qual_stable');
+            if (score >= 50) return t('qual_limited');
+            return t('qual_critical');
+        }
+
+        function updateBar(id, val, label) {
+            document.getElementById(`val-${id}`).innerText = label;
+            document.getElementById(`bar-${id}`).style.width = val + "%";
+            document.getElementById(`bar-${id}`).style.backgroundColor = getScoreColor(val);
+        }
+
+        function getScoreColor(s) {
+            if (s >= 90) return '#10b981';
+            if (s >= 75) return '#f59e0b';
+            return '#ef4444';
+        }
+
+        function closeModal() {
+            document.getElementById('xai-modal').style.display = 'none';
+            window.currentOpenModalIndex = undefined;
+        }
+
+        // Start
+        init();
+
+    </script>
+</body>
+
+</html>
